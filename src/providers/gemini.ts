@@ -120,6 +120,11 @@ export class GeminiProvider implements LLMProvider {
     return {
       text: response.text || '',
       groundingMetadata: extractGroundingMetadata(response),
+      usage: response.usageMetadata ? {
+        inputTokens: response.usageMetadata.promptTokenCount || 0,
+        outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: response.usageMetadata.totalTokenCount || 0,
+      } : undefined,
     };
   }
 
@@ -149,6 +154,11 @@ export class GeminiProvider implements LLMProvider {
     return {
       text: response.text || '',
       groundingMetadata: extractGroundingMetadata(response),
+      usage: response.usageMetadata ? {
+        inputTokens: response.usageMetadata.promptTokenCount || 0,
+        outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: response.usageMetadata.totalTokenCount || 0,
+      } : undefined,
     };
   }
 

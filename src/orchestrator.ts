@@ -32,7 +32,8 @@ import {
   type AdaptiveCompressionConfig,
   type RefinementConfig,
 } from './advanced-features.js';
-import type { Message } from './providers/types.js';
+import type { Message, TokenUsage } from './providers/types.js';
+import { calculateCost } from './pricing.js';
 
 /**
  * RLM Orchestrator manages the agentic loop
@@ -107,6 +108,16 @@ export class RLMOrchestrator {
   private selectiveAttention: SelectiveAttention;
   private iterativeRefiner: IterativeRefiner;
 
+  // Usage tracking
+  private currentTokenUsage: TokenUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+  };
+  private currentCostUsd: number = 0;
+
   /** Enable/disable context compression (default: true) */
   public enableContextCompression = true;
 
@@ -134,7 +145,7 @@ export class RLMOrchestrator {
       subModel: config.subModel || defaultModel,
       maxRecursionDepth: config.maxRecursionDepth || 3,
       maxTurns: config.maxTurns || 10,
-      timeoutMs: config.timeoutMs || 300000,
+      timeoutMs: config.timeoutMs || 600000,
       maxSubCalls: config.maxSubCalls || 15,
       mode: config.mode || 'code-analysis',
     };
@@ -207,6 +218,16 @@ export class RLMOrchestrator {
     this.selectiveAttention.setQueryContext(query);
     this.selectiveAttention.adjustWeightsForQuery(query);
 
+    // Reset usage tracking for new query
+    this.currentTokenUsage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
+    };
+    this.currentCostUsd = 0;
+
     // Set up sub-LLM callback with adaptive compression
     this.executor.setSubLLMCallback(async (subQuery: string) => {
       // Report sub-LLM phase
@@ -266,6 +287,8 @@ export class RLMOrchestrator {
           subCallCount: this.executor.getSubCallCount(),
           error: 'Timeout exceeded',
           tokenSavings: this.enableContextCompression ? this.getTokenSavings() : undefined,
+          tokenUsage: this.currentTokenUsage,
+          costUsd: this.currentCostUsd,
         };
       }
 
@@ -497,6 +520,8 @@ Make ${minSubCalls - currentSubCalls} more llm_query() calls, then call FINAL() 
           executionTimeMs: Date.now() - startTime,
           subCallCount: this.executor.getSubCallCount(),
           tokenSavings: this.enableContextCompression ? this.getTokenSavings() : undefined,
+          tokenUsage: this.currentTokenUsage,
+          costUsd: this.currentCostUsd,
         };
       }
 
@@ -525,6 +550,8 @@ Your FINAL() was rejected. Use llm_query() to analyze ${minSubCalls - currentSub
           executionTimeMs: Date.now() - startTime,
           subCallCount: this.executor.getSubCallCount(),
           tokenSavings: this.enableContextCompression ? this.getTokenSavings() : undefined,
+          tokenUsage: this.currentTokenUsage,
+          costUsd: this.currentCostUsd,
         };
       }
     }
@@ -538,6 +565,8 @@ Your FINAL() was rejected. Use llm_query() to analyze ${minSubCalls - currentSub
       subCallCount: this.executor.getSubCallCount(),
       error: `Max turns (${this.config.maxTurns}) exceeded. Partial output:\n${this.executor.getOutput()}`,
       tokenSavings: this.enableContextCompression ? this.getTokenSavings() : undefined,
+      tokenUsage: this.currentTokenUsage,
+      costUsd: this.currentCostUsd,
     };
   }
 
@@ -566,6 +595,10 @@ Your FINAL() was rejected. Use llm_query() to analyze ${minSubCalls - currentSub
         // If using fallback and it worked, log it
         if (model !== this.config.rootModel && this.verbose) {
           console.log(`  [Info] Using fallback model: ${model}`);
+        }
+
+        if (response.usage) {
+          this.accumulateUsage(model, response.usage);
         }
 
         return response.text || '';
@@ -613,6 +646,10 @@ Your FINAL() was rejected. Use llm_query() to analyze ${minSubCalls - currentSub
           maxTokens,
         });
 
+        if (response.usage) {
+          this.accumulateUsage(currentModel, response.usage);
+        }
+
         return response.text || '';
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -626,6 +663,23 @@ Your FINAL() was rejected. Use llm_query() to analyze ${minSubCalls - currentSub
     }
 
     throw new Error('All models failed for sub-LLM call');
+  }
+
+  /**
+   * Accumulate token usage and calculate total costs
+   */
+  private accumulateUsage(modelId: string, usage: TokenUsage) {
+    this.currentTokenUsage.inputTokens += usage.inputTokens;
+    this.currentTokenUsage.outputTokens += usage.outputTokens;
+    this.currentTokenUsage.totalTokens += usage.totalTokens;
+    if (usage.cacheCreationTokens) {
+      this.currentTokenUsage.cacheCreationTokens = (this.currentTokenUsage.cacheCreationTokens || 0) + usage.cacheCreationTokens;
+    }
+    if (usage.cacheReadTokens) {
+      this.currentTokenUsage.cacheReadTokens = (this.currentTokenUsage.cacheReadTokens || 0) + usage.cacheReadTokens;
+    }
+
+    this.currentCostUsd += calculateCost(modelId, usage);
   }
 
   /**

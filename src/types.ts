@@ -89,6 +89,10 @@ export interface RLMResult {
   error?: string;
   /** Token savings from context compression (if enabled) */
   tokenSavings?: TokenSavings;
+  /** Token usage statistics across all LLM calls */
+  tokenUsage?: import('./providers/types.js').TokenUsage;
+  /** Estimated cost in USD */
+  costUsd?: number;
 }
 
 export interface CodeAnalysisOptions {
@@ -170,7 +174,7 @@ export function getDefaultRLMConfig(modelOverride?: string): RLMConfig {
     subModel: model,
     maxRecursionDepth: 3,
     maxTurns: 10,
-    timeoutMs: 300000, // 5 minutes
+    timeoutMs: 600000, // 5 minutes
     maxSubCalls: 15,
     mode: 'code-analysis',
   };
@@ -186,7 +190,7 @@ export const DEFAULT_CONFIG: RLMConfig = {
   subModel: 'gemini-3-flash-preview',
   maxRecursionDepth: 3,
   maxTurns: 10,
-  timeoutMs: 300000, // 5 minutes
+  timeoutMs: 600000, // 5 minutes
   maxSubCalls: 15,
   mode: 'code-analysis',
 };

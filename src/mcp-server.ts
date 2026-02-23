@@ -58,6 +58,42 @@ import {
   CallToolRequestSchema,
   type CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { RLMResult } from './types.js';
+
+/**
+ * Formats an RLMResult into text for an MCP tool response,
+ * including metrics like token usage and estimated cost if available.
+ */
+function formatResult(result: RLMResult, fallbackMessage: string): string {
+  if (!result.success) {
+    return `Error: ${result.error}`;
+  }
+
+  let text = result.answer || fallbackMessage;
+  const stats: string[] = [];
+
+  if (result.tokenSavings && result.tokenSavings.savings > 0) {
+    stats.push(`📊 Token Optimization: ${result.tokenSavings.savings.toFixed(1)}% context savings`);
+  }
+
+  if (result.tokenUsage) {
+    stats.push(`🪙 Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in / ${result.tokenUsage.outputTokens.toLocaleString()} out)`);
+  }
+
+  if (result.costUsd !== undefined && result.costUsd > 0) {
+    stats.push(`💸 Cost: $${result.costUsd.toFixed(4)}`);
+  }
+
+  if (stats.length > 0) {
+    const statsText = stats.join('\n');
+    text += `\n\n---\n${statsText}`;
+
+    // Also log to stderr so it shows up in KiloCode's MCP output panel
+    console.error(`\n[rlm-analyzer] Operation completed:\n${statsText}\n`);
+  }
+
+  return text;
+}
 
 import {
   analyzeCodebase,
@@ -283,7 +319,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
 
     // Resolve model alias using provider-specific resolution
     const model = args?.model ? resolveProviderModelAlias(args.model as string, provider) : undefined;
-    const options = { ...(model ? { model } : {}), provider };
+
+    // Setup analysis options with progress tracking to prevent timeouts
+    const options: any = {
+      ...(model ? { model } : {}),
+      provider
+    };
+
+    // Extract progress token if supported by the client
+    const progressToken = (request.params as any)._meta?.progressToken;
+
+    if (progressToken) {
+      options.onProgress = (progressData: any) => {
+        void server.notification({
+          method: 'notifications/progress',
+          params: {
+            progressToken,
+            progress: typeof progressData.subCallCount === 'number' ? progressData.subCallCount : 0
+          }
+        });
+      };
+    }
 
     switch (name) {
       case 'rlm_analyze': {
@@ -300,19 +356,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
           ...options,
         });
 
-        // Build response with token savings info if available
-        let responseText = result.success
-          ? result.answer || 'Analysis complete but no answer generated.'
-          : `Error: ${result.error}`;
-
-        if (result.success && result.tokenSavings && result.tokenSavings.savings > 0) {
-          responseText += `\n\n---\n📊 Token Optimization: ${result.tokenSavings.savings}% context savings`;
-        }
-
         return {
           content: [{
             type: 'text',
-            text: responseText,
+            text: formatResult(result, 'Analysis complete but no answer generated.'),
           }],
           isError: !result.success,
         };
@@ -325,9 +372,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         return {
           content: [{
             type: 'text',
-            text: result.success
-              ? result.answer || 'Summary complete but no content generated.'
-              : `Error: ${result.error}`,
+            text: formatResult(result, 'Summary complete but no content generated.'),
           }],
           isError: !result.success,
         };
@@ -340,9 +385,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         return {
           content: [{
             type: 'text',
-            text: result.success
-              ? result.answer || 'Architecture analysis complete.'
-              : `Error: ${result.error}`,
+            text: formatResult(result, 'Architecture analysis complete.'),
           }],
           isError: !result.success,
         };
@@ -355,9 +398,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         return {
           content: [{
             type: 'text',
-            text: result.success
-              ? result.answer || 'Security analysis complete.'
-              : `Error: ${result.error}`,
+            text: formatResult(result, 'Security analysis complete.'),
           }],
           isError: !result.success,
         };
@@ -370,9 +411,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         return {
           content: [{
             type: 'text',
-            text: result.success
-              ? result.answer || 'Dependency analysis complete.'
-              : `Error: ${result.error}`,
+            text: formatResult(result, 'Dependency analysis complete.'),
           }],
           isError: !result.success,
         };
@@ -385,9 +424,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         return {
           content: [{
             type: 'text',
-            text: result.success
-              ? result.answer || 'Refactoring analysis complete.'
-              : `Error: ${result.error}`,
+            text: formatResult(result, 'Refactoring analysis complete.'),
           }],
           isError: !result.success,
         };
@@ -400,9 +437,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         return {
           content: [{
             type: 'text',
-            text: result.success
-              ? result.answer || 'Question answered but no content generated.'
-              : `Error: ${result.error}`,
+            text: formatResult(result, 'Question answered but no content generated.'),
           }],
           isError: !result.success,
         };

@@ -571,6 +571,12 @@ async function runCommand(
   log(`Files analyzed: ${result.filesAnalyzed.length}`, 'dim');
   log(`Turns: ${result.turns.length}`, 'dim');
   log(`Sub-LLM calls: ${result.subCallCount}`, 'dim');
+  if (result.tokenUsage) {
+    log(`Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in, ${result.tokenUsage.outputTokens.toLocaleString()} out)`, 'dim');
+  }
+  if (result.costUsd !== undefined && result.costUsd > 0) {
+    log(`Est. Cost: $${result.costUsd.toFixed(4)}`, 'green');
+  }
   log(`Time: ${duration}s`, 'dim');
 
   // Save to markdown file if output option specified
@@ -593,7 +599,7 @@ function generateMarkdownReport(
   command: string,
   target: string | undefined,
   directory: string,
-  result: { success: boolean; answer: string | null; filesAnalyzed: string[]; turns: RLMTurn[]; subCallCount: number; error?: string },
+  result: { success: boolean; answer: string | null; filesAnalyzed: string[]; turns: RLMTurn[]; subCallCount: number; error?: string; tokenUsage?: any; costUsd?: number },
   duration: string,
   provider: string
 ): string {
@@ -612,6 +618,12 @@ function generateMarkdownReport(
   md += `| Files Analyzed | ${result.filesAnalyzed.length} |\n`;
   md += `| Turns | ${result.turns.length} |\n`;
   md += `| Sub-LLM Calls | ${result.subCallCount} |\n`;
+  if (result.tokenUsage) {
+    md += `| Tokens | ${result.tokenUsage.totalTokens.toLocaleString()} |\n`;
+  }
+  if (result.costUsd !== undefined && result.costUsd > 0) {
+    md += `| Est. Cost | $${result.costUsd.toFixed(4)} |\n`;
+  }
   md += `| Duration | ${duration}s |\n`;
   md += `| Status | ${result.success ? '✅ Success' : '❌ ' + (result.error || 'Incomplete')} |\n\n`;
 
