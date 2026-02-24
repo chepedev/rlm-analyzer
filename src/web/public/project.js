@@ -111,15 +111,22 @@ function renderLogsTable(logs) {
     tbody.innerHTML = '<tr><td colspan="5" class="loading">No activity yet.</td></tr>';
     return;
   }
-  tbody.innerHTML = logs.map(log => `
+  tbody.innerHTML = logs.map(log => {
+    let notes = log.analysisType || '';
+    if (notes === 'coding-session') notes = '';
+    const displayNotes = notes ? notes : '<span style="color: var(--text-muted)">—</span>';
+
+    return `
     <tr>
       <td>${new Date(log.timestamp).toLocaleString()}</td>
       <td><span class="badge badge-${log.source}">${log.source.toUpperCase()}</span></td>
       <td class="code-font">${log.model}</td>
       <td>${fmtNum(log.inputTokens)} / ${fmtNum(log.outputTokens)}</td>
       <td class="cost-cell">${fmt(log.costUsd)}</td>
+      <td class="notes-cell" title="${notes.replace(/"/g, '&quot;')}">${displayNotes}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderMonthlyTable(monthData) {

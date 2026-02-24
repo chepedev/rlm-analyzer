@@ -163,10 +163,11 @@ pagesRouter.get('/project/:name', (req: Request, res: Response) => {
               <th>Model</th>
               <th>Tokens (In/Out)</th>
               <th>Cost (USD)</th>
+              <th>Notes</th>
             </tr>
           </thead>
           <tbody id="logs-tbody">
-            <tr><td colspan="5" class="loading">Loading…</td></tr>
+            <tr><td colspan="6" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>

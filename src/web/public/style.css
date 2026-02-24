@@ -1,4 +1,10 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
   --bg: #0f1117;
@@ -13,7 +19,7 @@
   --danger-hover: #dc2626;
   --success: #22c55e;
   --radius: 10px;
-  --shadow: 0 2px 12px rgba(0,0,0,0.4);
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
 body {
@@ -46,7 +52,9 @@ body {
   letter-spacing: -0.02em;
 }
 
-.nav-brand:hover { color: var(--accent); }
+.nav-brand:hover {
+  color: var(--accent);
+}
 
 .nav-subtitle {
   color: var(--text-muted);
@@ -88,7 +96,9 @@ body {
   margin-bottom: 0.25rem;
 }
 
-.back-link:hover { color: var(--accent); }
+.back-link:hover {
+  color: var(--accent);
+}
 
 .cards-row {
   display: grid;
@@ -200,16 +210,35 @@ td {
   vertical-align: middle;
 }
 
-tr:last-child td { border-bottom: none; }
+tr:last-child td {
+  border-bottom: none;
+}
 
-tr:hover td { background: var(--surface2); }
+tr:hover td {
+  background: var(--surface2);
+}
 
-td a { color: var(--accent); text-decoration: none; }
-td a:hover { text-decoration: underline; }
+td a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+td a:hover {
+  text-decoration: underline;
+}
 
 .cost-cell {
   font-weight: 700;
   color: var(--text);
+}
+
+.notes-cell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 .code-font {
@@ -218,7 +247,12 @@ td a:hover { text-decoration: underline; }
   color: var(--text-muted);
 }
 
-.loading { color: var(--text-muted); font-style: italic; text-align: center; padding: 2rem; }
+.loading {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 2rem;
+}
 
 .btn {
   display: inline-flex;
@@ -233,8 +267,14 @@ td a:hover { text-decoration: underline; }
   transition: background 0.15s;
 }
 
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: var(--danger-hover); }
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: var(--danger-hover);
+}
 
 .btn-sm {
   padding: 0.3rem 0.65rem;
@@ -253,13 +293,37 @@ td a:hover { text-decoration: underline; }
   color: var(--text-muted);
 }
 
-.badge-cli { background: #3b82f633; color: #60a5fa; }
-.badge-mcp { background: #8b5cf633; color: #a78bfa; }
-.badge-kilocode { background: #10b98133; color: #34d399; }
+.badge-cli {
+  background: #3b82f633;
+  color: #60a5fa;
+}
+
+.badge-mcp {
+  background: #8b5cf633;
+  color: #a78bfa;
+}
+
+.badge-kilocode {
+  background: #10b98133;
+  color: #34d399;
+}
 
 @media (max-width: 640px) {
-  .container { padding: 1rem; }
-  .page-header { flex-direction: column; align-items: flex-start; }
-  .card-value { font-size: 1.4rem; }
-  .section-header { flex-direction: column; align-items: flex-start; }
+  .container {
+    padding: 1rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .card-value {
+    font-size: 1.4rem;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
