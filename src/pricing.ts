@@ -101,5 +101,14 @@ export function calculateCost(modelId: string, usage: TokenUsage | undefined): n
         cost += (usage.cacheReadTokens / 1_000_000) * pricing.inputPer1M;
     }
 
+    // Add tool use and thoughts token costs
+    if (usage.toolUseTokens) {
+        cost += (usage.toolUseTokens / 1_000_000) * pricing.inputPer1M;
+    }
+
+    if (usage.thoughtsTokens) {
+        cost += (usage.thoughtsTokens / 1_000_000) * pricing.outputPer1M;
+    }
+
     return cost;
 }
