@@ -10,8 +10,9 @@ export interface ModelPricing {
 // Pricing as of early 2025, in USD per 1M tokens
 export const PRICING_DATA: Record<string, ModelPricing> = {
     // Gemini Models (Google AI Studio)
-    'gemini-3-flash-preview': { inputPer1M: 0.075, outputPer1M: 0.30 }, // Assuming Gemini 1.5 Flash pricing for now
-    'gemini-3-pro-preview': { inputPer1M: 1.25, outputPer1M: 5.00 },    // Assuming Gemini 1.5 Pro pricing for now
+    'gemini-3-flash-preview': { inputPer1M: 0.50, outputPer1M: 3.00 },
+    'gemini-3-pro-preview': { inputPer1M: 2.50, outputPer1M: 10.00 }, // Extrapolated Pro relative pricing based on history
+    'gemini-2.5-pro': { inputPer1M: 2.00, outputPer1M: 8.00 },
     'gemini-2.5-flash': { inputPer1M: 0.075, outputPer1M: 0.30 },
     'gemini-2.0-flash-exp': { inputPer1M: 0.075, outputPer1M: 0.30 },
     'gemini-1.5-flash': { inputPer1M: 0.075, outputPer1M: 0.30 },
