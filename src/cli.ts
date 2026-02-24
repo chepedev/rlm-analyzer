@@ -590,8 +590,16 @@ async function runCommand(
   log(`Sub-LLM calls: ${result.subCallCount}`, 'dim');
   if (result.tokenUsage) {
     const cachedTokens = result.tokenUsage.cacheReadTokens || 0;
-    const cacheStr = cachedTokens > 0 ? `, ${cachedTokens.toLocaleString()} cached` : '';
-    log(`Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in, ${result.tokenUsage.outputTokens.toLocaleString()} out${cacheStr})`, 'dim');
+    const cacheCreationTokens = result.tokenUsage.cacheCreationTokens || 0;
+    const toolTokens = result.tokenUsage.toolUseTokens || 0;
+    const thoughtsTokens = result.tokenUsage.thoughtsTokens || 0;
+
+    let cacheStr = cachedTokens > 0 ? `, ${cachedTokens.toLocaleString()} cache read` : '';
+    let cacheCrStr = cacheCreationTokens > 0 ? `, ${cacheCreationTokens.toLocaleString()} cache creation` : '';
+    let toolStr = toolTokens > 0 ? `, ${toolTokens.toLocaleString()} tool` : '';
+    let thoughtsStr = thoughtsTokens > 0 ? `, ${thoughtsTokens.toLocaleString()} thoughts` : '';
+
+    log(`Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in, ${result.tokenUsage.outputTokens.toLocaleString()} out${cacheStr}${cacheCrStr}${toolStr}${thoughtsStr})`, 'dim');
   }
   if (result.costUsd !== undefined && result.costUsd > 0) {
     log(`Est. Cost: $${result.costUsd.toFixed(4)}`, 'green');

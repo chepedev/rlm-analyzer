@@ -678,6 +678,12 @@ Your FINAL() was rejected. Use llm_query() to analyze ${minSubCalls - currentSub
     if (usage.cacheReadTokens) {
       this.currentTokenUsage.cacheReadTokens = (this.currentTokenUsage.cacheReadTokens || 0) + usage.cacheReadTokens;
     }
+    if (usage.toolUseTokens) {
+      this.currentTokenUsage.toolUseTokens = (this.currentTokenUsage.toolUseTokens || 0) + usage.toolUseTokens;
+    }
+    if (usage.thoughtsTokens) {
+      this.currentTokenUsage.thoughtsTokens = (this.currentTokenUsage.thoughtsTokens || 0) + usage.thoughtsTokens;
+    }
 
     this.currentCostUsd += calculateCost(modelId, usage);
   }

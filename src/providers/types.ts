@@ -44,6 +44,10 @@ export interface TokenUsage {
   cacheCreationTokens?: number;
   /** Cache read tokens (Claude-specific) */
   cacheReadTokens?: number;
+  /** Tokens used by tool executions */
+  toolUseTokens?: number;
+  /** Tokens used by the model's thoughts */
+  thoughtsTokens?: number;
 }
 
 /** Response from text generation */

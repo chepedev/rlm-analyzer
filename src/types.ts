@@ -386,6 +386,16 @@ export interface FileChunk {
   summary?: string;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
+  toolUseTokens?: number;
+  thoughtsTokens?: number;
+}
+
 /** Directories to ignore by default */
 export const IGNORE_DIRS = [
   'node_modules',

@@ -125,6 +125,8 @@ export class GeminiProvider implements LLMProvider {
         outputTokens: response.usageMetadata.candidatesTokenCount || 0,
         totalTokens: response.usageMetadata.totalTokenCount || 0,
         cacheReadTokens: response.usageMetadata.cachedContentTokenCount || 0,
+        toolUseTokens: response.usageMetadata.toolUsePromptTokenCount || 0,
+        thoughtsTokens: response.usageMetadata.thoughtsTokenCount || 0,
       } : undefined,
     };
   }
@@ -160,6 +162,8 @@ export class GeminiProvider implements LLMProvider {
         outputTokens: response.usageMetadata.candidatesTokenCount || 0,
         totalTokens: response.usageMetadata.totalTokenCount || 0,
         cacheReadTokens: response.usageMetadata.cachedContentTokenCount || 0,
+        toolUseTokens: response.usageMetadata.toolUsePromptTokenCount || 0,
+        thoughtsTokens: response.usageMetadata.thoughtsTokenCount || 0,
       } : undefined,
     };
   }
