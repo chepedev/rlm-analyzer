@@ -19,6 +19,8 @@ Analyze any codebase with AI that can process **100x beyond context limits**. Po
 - **Multi-Provider Support** - Choose between Gemini (default), Amazon Bedrock (Nova/Claude/Llama), or Claude (Anthropic API)
 - **Web Grounding** - Verify package versions with real-time web search (Gemini & Nova Premier)
 - **MCP Integration** - Works with Claude Code, Cursor, and other MCP clients
+- **Token Tracking** - Detailed breakdown of token usage (input, output, cache, thoughts, tools)
+- **Cost Estimation** - Accurately calculate and track token costs across different models
 - **Cost Efficient** - Save 60-73% on API costs by offloading to Gemini/Nova
 - **Token Optimization** - Context compression saves additional 50-70%
 
@@ -48,6 +50,7 @@ Analyze any codebase with AI that can process **100x beyond context limits**. Po
 - Added web dashboard (`rlm dashboard`) for visualizing API cost tracking per project, per day, and per month.
 - Added MongoDB cost logging — all CLI and MCP server usage is automatically recorded.
 - Added REST API (`/api/summary`, `/api/projects`, `/api/logs`) for programmatic access to usage data.
+- Added real-time token tracking breakdowns and accurate API cost estimations into CLI output and MCP Server logs.
 
 **v1.6.1**
 - Added full support for Flutter/Dart apps featuring structural indexing, layout analysis, and mobile-aware system prompts.
