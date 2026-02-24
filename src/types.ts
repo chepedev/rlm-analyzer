@@ -131,6 +131,10 @@ export interface CodeAnalysisResult extends RLMResult {
   filesAnalyzed: string[];
   /** Analysis type performed */
   analysisType: AnalysisType;
+  /** Whether the structural index cache was used */
+  cacheHit?: boolean;
+  /** Number of files that changed since last cache */
+  changedFilesCount?: number;
 }
 
 export interface ExecutorResult {

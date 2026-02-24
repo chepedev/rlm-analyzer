@@ -27,6 +27,7 @@ Analyze any codebase with AI that can process **100x beyond context limits**. Po
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [CLI Reference](#cli-reference)
+- [Cost Tracking Dashboard](#-cost-tracking-dashboard)
 - [MCP Server Integration](#mcp-server-integration)
 - [Programmatic API](#programmatic-api)
 - [Model Configuration](#model-configuration)
@@ -42,6 +43,11 @@ Analyze any codebase with AI that can process **100x beyond context limits**. Po
 - **[Models & Commands Reference](docs/models-and-commands.md)** - Complete list of CLI commands, model IDs, and aliases for Gemini, Bedrock, and Claude
 
 ## Changelog
+
+**v1.7.0**
+- Added web dashboard (`rlm dashboard`) for visualizing API cost tracking per project, per day, and per month.
+- Added MongoDB cost logging — all CLI and MCP server usage is automatically recorded.
+- Added REST API (`/api/summary`, `/api/projects`, `/api/logs`) for programmatic access to usage data.
 
 **v1.6.1**
 - Added full support for Flutter/Dart apps featuring structural indexing, layout analysis, and mobile-aware system prompts.
@@ -218,6 +224,119 @@ rlm summary -o rlm-context.md
 # Verbose mode to see sub-LLM calls and compression
 rlm security -v
 ```
+
+---
+
+## 📊 Cost Tracking Dashboard
+
+RLM Analyzer now tracks API usage costs in MongoDB and provides a web dashboard to visualize spending per project, per day, and per month.
+
+### Prerequisites
+
+MongoDB must be running. You can start it quickly with Docker:
+
+```bash
+docker run -d -p 27017:27017 mongodb/mongodb-community-server:latest
+```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017` |
+| `RLM_WEB_PORT` | Dashboard port | `9876` |
+
+### Starting the Dashboard
+
+```bash
+rlm dashboard
+rlm dashboard --port 8080
+```
+
+Once running, open your browser to `http://localhost:9876` (or the configured port) to view the dashboard.
+
+### Features
+
+- **Automatic cost logging** — All CLI and MCP server usage is automatically logged to MongoDB
+- **Per-project cost breakdown** — View spending broken down by project, daily, and monthly
+- **Clean logs** — Delete usage logs by project, date range, or all at once
+- **REST API** — Programmatic access via `/api/*` endpoints
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/summary` | GET | Cost summary by project/period |
+| `/api/projects` | GET | List all tracked projects |
+| `/api/projects/:name` | GET | Project detail |
+| `/api/logs` | DELETE | Clean logs |
+
+### Kilo Code Integration
+
+Track your Kilo Code AI coding session costs alongside RLM analysis costs. This requires two things: configuring the MCP server in Kilo Code, and adding a rules file to your project.
+
+#### Step 1: Configure the MCP Server in Kilo Code
+
+Open Kilo Code's MCP settings via **Kilo Code panel → Settings (gear icon) → MCP Servers**, or edit the file directly:
+
+- **macOS:** `~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json`
+- **Linux:** `~/.config/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json`
+
+Add the `rlm-analyzer` entry to your `mcpServers` object:
+
+**Option A: Direct node invocation (local install)**
+```json
+{
+  "mcpServers": {
+    "rlm-analyzer": {
+      "command": "node",
+      "args": ["/absolute/path/to/rlm-analyzer/dist/mcp-server.js"],
+      "env": {
+        "GEMINI_API_KEY": "your-gemini-api-key",
+        "MONGODB_URI": "mongodb://localhost:27017"
+      },
+      "timeout": 600
+    }
+  }
+}
+```
+
+**Option B: npx (no local install required)**
+```json
+{
+  "mcpServers": {
+    "rlm-analyzer": {
+      "command": "npx",
+      "args": ["-y", "rlm-analyzer-mcp"],
+      "env": {
+        "GEMINI_API_KEY": "your-gemini-api-key",
+        "MONGODB_URI": "mongodb://localhost:27017"
+      },
+      "timeout": 600
+    }
+  }
+}
+```
+
+> **Note:** `MONGODB_URI` is only required for cost tracking. If you only want code analysis, you can omit it.
+
+#### Step 2: Add Rules to Your Project
+
+Copy the rules template to your project's `.kilo` directory:
+
+```bash
+mkdir -p .kilo && cp node_modules/rlm-analyzer/templates/kilocode-rules.md .kilo/rules.md
+```
+
+Or create `.kilo/rules.md` manually — see [`templates/kilocode-rules.md`](templates/kilocode-rules.md) for the content.
+
+#### How It Works
+
+1. Kilo Code reads `.kilo/rules.md` at the start of each task
+2. The rule instructs the AI to call `rlm_log_session` at the end of every task
+3. `rlm_log_session` writes the session cost, model, and project name to MongoDB
+4. View all costs — both RLM analysis and Kilo Code sessions — in the dashboard at http://localhost:9876
 
 ---
 

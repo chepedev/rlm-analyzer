@@ -28,6 +28,7 @@
  */
 
 import * as path from 'path';
+import { logUsage } from './cost-logger.js';
 import {
   analyzeArchitecture,
   analyzeDependencies,
@@ -305,6 +306,7 @@ function parseArgs(args: string[]): {
     output: string | null;
     grounding: boolean;
     noCache: boolean;
+    port: string | null;
   };
 } {
   const options = {
@@ -318,6 +320,7 @@ function parseArgs(args: string[]): {
     output: null as string | null,
     grounding: false,
     noCache: false,
+    port: null as string | null,
   };
 
   let command = '';
@@ -377,6 +380,11 @@ function parseArgs(args: string[]): {
       options.grounding = true;
     } else if (arg === '--no-cache') {
       options.noCache = true;
+    } else if (arg === '--port') {
+      i++;
+      options.port = args[i] || null;
+    } else if (arg.startsWith('--port=')) {
+      options.port = arg.slice(7);
     } else if (!command) {
       command = arg;
     } else if (!target) {
@@ -429,7 +437,7 @@ function createProgressCallback(progressTracker: ProgressTracker): (progress: RL
 async function runCommand(
   command: string,
   target: string | undefined,
-  options: { dir: string; model: string; provider: ProviderName | undefined; verbose: boolean; json: boolean; output: string | null; grounding: boolean; noCache: boolean }
+  options: { dir: string; model: string; provider: ProviderName | undefined; verbose: boolean; json: boolean; output: string | null; grounding: boolean; noCache: boolean; port: string | null }
 ): Promise<void> {
   const startTime = Date.now();
 
@@ -460,6 +468,15 @@ async function runCommand(
   };
 
   let result;
+
+  // Handle dashboard command before switch
+  if (command === 'dashboard') {
+    progressTracker?.stop();
+    const { startDashboard } = await import('./web/server.js');
+    const port = options.port ? parseInt(options.port) : undefined;
+    startDashboard(port);
+    return; // keep running
+  }
 
   // Handle clear-cache command before switch
   if (command === 'clear-cache') {
@@ -572,12 +589,32 @@ async function runCommand(
   log(`Turns: ${result.turns.length}`, 'dim');
   log(`Sub-LLM calls: ${result.subCallCount}`, 'dim');
   if (result.tokenUsage) {
-    log(`Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in, ${result.tokenUsage.outputTokens.toLocaleString()} out)`, 'dim');
+    const cachedTokens = result.tokenUsage.cacheReadTokens || 0;
+    const cacheStr = cachedTokens > 0 ? `, ${cachedTokens.toLocaleString()} cached` : '';
+    log(`Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in, ${result.tokenUsage.outputTokens.toLocaleString()} out${cacheStr})`, 'dim');
   }
   if (result.costUsd !== undefined && result.costUsd > 0) {
     log(`Est. Cost: $${result.costUsd.toFixed(4)}`, 'green');
   }
   log(`Time: ${duration}s`, 'dim');
+
+  // Log usage to MongoDB (fire-and-forget)
+  logUsage({
+    provider: provider.name,
+    model: options.model,
+    analysisType: command,
+    directory: options.dir,
+    inputTokens: result.tokenUsage?.inputTokens ?? 0,
+    outputTokens: result.tokenUsage?.outputTokens ?? 0,
+    totalTokens: result.tokenUsage?.totalTokens ?? 0,
+    costUsd: result.costUsd ?? 0,
+    executionTimeMs: parseFloat(duration) * 1000,
+    subCallCount: result.subCallCount ?? 0,
+    source: 'cli',
+    success: result.success,
+    cacheHit: result.cacheHit,
+    changedFilesCount: result.changedFilesCount,
+  }).catch(() => { /* silent */ });
 
   // Save to markdown file if output option specified
   if (options.output) {

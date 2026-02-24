@@ -1,6 +1,6 @@
 {
   "name": "rlm-analyzer",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "AI-powered code analysis using Recursive Language Models (RLMs). Analyze entire codebases 100x beyond context limits with deep architecture, security, and refactoring analysis. Supports Gemini and Amazon Bedrock.",
   "type": "module",
   "main": "dist/index.js",
@@ -39,11 +39,12 @@
     "rlm": "dist/main.js",
     "rlm-analyzer": "dist/main.js",
     "rlm-mcp": "dist/mcp-server.js",
-    "rlm-analyzer-mcp": "dist/mcp-server.js"
+    "rlm-analyzer-mcp": "dist/mcp-server.js",
+    "rlm-dashboard": "dist/web/server.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && tsc && chmod +x dist/main.js dist/cli.js dist/mcp-server.js",
+    "build": "npm run clean && tsc && cp -r src/web/public dist/web/public && chmod +x dist/main.js dist/cli.js dist/mcp-server.js",
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
     "test": "node --test",
@@ -96,9 +97,12 @@
   "dependencies": {
     "@google/genai": "^1.0.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "dotenv": "^16.5.0"
+    "dotenv": "^16.5.0",
+    "express": "^5.2.1",
+    "mongodb": "^7.1.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^20.10.0",
     "typescript": "^5.3.0"
   },

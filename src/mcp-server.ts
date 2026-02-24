@@ -50,6 +50,7 @@
  */
 
 import { fileURLToPath } from 'url';
+import { logUsage } from './cost-logger.js';
 import { realpathSync } from 'fs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -58,12 +59,32 @@ import {
   CallToolRequestSchema,
   type CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { RLMResult } from './types.js';
+import type { RLMResult, CodeAnalysisResult } from './types.js';
 
 /**
  * Formats an RLMResult into text for an MCP tool response,
  * including metrics like token usage and estimated cost if available.
  */
+function logMcpUsage(result: RLMResult | CodeAnalysisResult, directory: string, analysisType: string, provider: string, model: string, startTime: number): void {
+  const codeResult = result as CodeAnalysisResult;
+  logUsage({
+    provider,
+    model,
+    analysisType,
+    directory,
+    inputTokens: result.tokenUsage?.inputTokens ?? 0,
+    outputTokens: result.tokenUsage?.outputTokens ?? 0,
+    totalTokens: result.tokenUsage?.totalTokens ?? 0,
+    costUsd: result.costUsd ?? 0,
+    executionTimeMs: Date.now() - startTime,
+    subCallCount: result.subCallCount ?? 0,
+    source: 'mcp',
+    success: result.success,
+    cacheHit: codeResult.cacheHit,
+    changedFilesCount: codeResult.changedFilesCount,
+  }).catch(() => { /* silent */ });
+}
+
 function formatResult(result: RLMResult, fallbackMessage: string): string {
   if (!result.success) {
     return `Error: ${result.error}`;
@@ -77,7 +98,9 @@ function formatResult(result: RLMResult, fallbackMessage: string): string {
   }
 
   if (result.tokenUsage) {
-    stats.push(`🪙 Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in / ${result.tokenUsage.outputTokens.toLocaleString()} out)`);
+    const cachedTokens = result.tokenUsage.cacheReadTokens || 0;
+    const cacheStr = cachedTokens > 0 ? ` / ${cachedTokens.toLocaleString()} cached` : '';
+    stats.push(`🪙 Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in / ${result.tokenUsage.outputTokens.toLocaleString()} out${cacheStr})`);
   }
 
   if (result.costUsd !== undefined && result.costUsd > 0) {
@@ -272,6 +295,23 @@ const TOOLS = [
       properties: {},
     },
   },
+  {
+    name: 'rlm_log_session',
+    description: 'Log an AI coding session (e.g., Kilo Code) usage to the cost tracking database. Call this at the end of each task to track spending.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        project: { type: 'string', description: 'Project name or directory path' },
+        model: { type: 'string', description: 'Model used (e.g., claude-sonnet-4-5, anthropic/claude-opus-4.6)' },
+        costUsd: { type: 'number', description: 'Total session cost in USD (from Current Cost in environment_details)' },
+        inputTokens: { type: 'number', description: 'Total input tokens (optional)', default: 0 },
+        outputTokens: { type: 'number', description: 'Total output tokens (optional)', default: 0 },
+        sessionNotes: { type: 'string', description: 'Brief description of what was done (optional)' },
+        source: { type: 'string', description: 'Source identifier (default: kilocode)', default: 'kilocode' },
+      },
+      required: ['project', 'model', 'costUsd'],
+    },
+  },
 ];
 
 // Create server
@@ -294,7 +334,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
     const provider = (args?.provider as ProviderName) || 'gemini';
 
     // Check credentials for analysis tools
-    if (name !== 'rlm_config' && !hasAnyCredentials()) {
+    if (name !== 'rlm_config' && name !== 'rlm_log_session' && !hasAnyCredentials()) {
       let errorMsg: string;
       if (provider === 'bedrock') {
         errorMsg = 'Error: AWS credentials not configured. Set AWS_BEARER_TOKEN_BEDROCK (recommended), or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, or AWS_PROFILE.';
@@ -313,12 +353,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
     }
 
     // Initialize provider for analysis tools
-    if (name !== 'rlm_config') {
+    if (name !== 'rlm_config' && name !== 'rlm_log_session') {
       initializeProvider(provider);
     }
 
     // Resolve model alias using provider-specific resolution
     const model = args?.model ? resolveProviderModelAlias(args.model as string, provider) : undefined;
+    const resolvedModel = model ?? 'default';
+    const mcpStartTime = Date.now();
 
     // Setup analysis options with progress tracking to prevent timeouts
     const options: any = {
@@ -356,6 +398,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
           ...options,
         });
 
+        logMcpUsage(result, directory, analysisType || (query ? 'custom' : 'summary'), provider, resolvedModel, mcpStartTime);
         return {
           content: [{
             type: 'text',
@@ -369,6 +412,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         const { directory } = args as { directory: string };
         const result = await summarizeCodebase(directory, options);
 
+        logMcpUsage(result, directory, 'summary', provider, resolvedModel, mcpStartTime);
         return {
           content: [{
             type: 'text',
@@ -382,6 +426,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         const { directory } = args as { directory: string };
         const result = await analyzeArchitecture(directory, options);
 
+        logMcpUsage(result, directory, 'architecture', provider, resolvedModel, mcpStartTime);
         return {
           content: [{
             type: 'text',
@@ -395,6 +440,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         const { directory } = args as { directory: string };
         const result = await analyzeSecurity(directory, options);
 
+        logMcpUsage(result, directory, 'security', provider, resolvedModel, mcpStartTime);
         return {
           content: [{
             type: 'text',
@@ -408,6 +454,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         const { directory } = args as { directory: string };
         const result = await analyzeDependencies(directory, options);
 
+        logMcpUsage(result, directory, 'dependencies', provider, resolvedModel, mcpStartTime);
         return {
           content: [{
             type: 'text',
@@ -421,6 +468,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         const { directory } = args as { directory: string };
         const result = await analyzeRefactoring(directory, options);
 
+        logMcpUsage(result, directory, 'refactor', provider, resolvedModel, mcpStartTime);
         return {
           content: [{
             type: 'text',
@@ -434,6 +482,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         const { directory, question } = args as { directory: string; question: string };
         const result = await askQuestion(directory, question, options);
 
+        logMcpUsage(result, directory, 'custom', provider, resolvedModel, mcpStartTime);
         return {
           content: [{
             type: 'text',
@@ -479,6 +528,35 @@ ${getProviderAliasesDisplay('claude')}
 
 Use 'provider' parameter to switch between providers.`,
           }],
+        };
+      }
+
+      case 'rlm_log_session': {
+        const { project, model: sessionModel, costUsd, inputTokens = 0, outputTokens = 0, sessionNotes, source = 'kilocode' } = args as {
+          project: string;
+          model: string;
+          costUsd: number;
+          inputTokens?: number;
+          outputTokens?: number;
+          sessionNotes?: string;
+          source?: string;
+        };
+        await logUsage({
+          provider: source,
+          model: sessionModel,
+          analysisType: sessionNotes || 'coding-session',
+          directory: project.startsWith('/') ? project : `/projects/${project}`,
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+          costUsd,
+          executionTimeMs: 0,
+          subCallCount: 0,
+          source,
+          success: true,
+        });
+        return {
+          content: [{ type: 'text', text: `✅ Session logged: ${project} — $${costUsd.toFixed(4)} (${sessionModel})` }],
         };
       }
 

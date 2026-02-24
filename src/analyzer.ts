@@ -141,6 +141,8 @@ export async function loadFilesWithIndex(
   files: Record<string, string>;
   index: StructuralIndex;
   largeFiles: string[];
+  cacheHit: boolean;
+  changedFilesCount: number;
 }> {
   const {
     maxFileSize = DEFAULT_MAX_FILE_SIZE,
@@ -150,14 +152,16 @@ export async function loadFilesWithIndex(
 
   // Build or load structural index
   let index: StructuralIndex;
-  let changedFiles: string[] | undefined;
+  let cacheHit = false;
+  let changedFilesCount = 0;
 
   if (useCache) {
     const result = await updateStructuralIndex(directory, { verbose });
     index = result.index;
-    changedFiles = result.changedFiles;
-    if (verbose && changedFiles.length > 0) {
-      console.log(`[Index] ${changedFiles.length} files changed since last run`);
+    cacheHit = true;
+    changedFilesCount = result.changedFiles.length;
+    if (verbose && result.changedFiles.length > 0) {
+      console.log(`[Index] ${result.changedFiles.length} files changed since last run`);
     }
   } else {
     index = await buildStructuralIndex(directory, { force: true, verbose });
@@ -200,7 +204,7 @@ export async function loadFilesWithIndex(
     }
   }
 
-  return { files, index, largeFiles };
+  return { files, index, largeFiles, cacheHit, changedFilesCount };
 }
 
 /**
@@ -218,7 +222,7 @@ export async function analyzeCodebase(
   const analysisType = options.analysisType || DEFAULT_ANALYSIS_TYPE;
 
   // Load files with structural index
-  const { files, index, largeFiles } = await loadFilesWithIndex(options.directory, {
+  const { files, index, largeFiles, cacheHit, changedFilesCount } = await loadFilesWithIndex(options.directory, {
     include: options.include,
     exclude: options.exclude,
     useCache,
@@ -270,6 +274,8 @@ export async function analyzeCodebase(
     ...result,
     filesAnalyzed: Object.keys(files),
     analysisType,
+    cacheHit,
+    changedFilesCount,
   };
 }
 
