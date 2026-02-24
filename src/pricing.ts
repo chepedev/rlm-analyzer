@@ -10,13 +10,13 @@ export interface ModelPricing {
 // Pricing as of early 2025, in USD per 1M tokens
 export const PRICING_DATA: Record<string, ModelPricing> = {
     // Gemini Models (Google AI Studio)
-    'gemini-3-flash-preview': { inputPer1M: 0.50, outputPer1M: 3.00 },
-    'gemini-3-pro-preview': { inputPer1M: 2.50, outputPer1M: 10.00 }, // Extrapolated Pro relative pricing based on history
-    'gemini-2.5-pro': { inputPer1M: 2.00, outputPer1M: 8.00 },
-    'gemini-2.5-flash': { inputPer1M: 0.075, outputPer1M: 0.30 },
-    'gemini-2.0-flash-exp': { inputPer1M: 0.075, outputPer1M: 0.30 },
-    'gemini-1.5-flash': { inputPer1M: 0.075, outputPer1M: 0.30 },
-    'gemini-1.5-pro': { inputPer1M: 1.25, outputPer1M: 5.00 },
+    'gemini-3-flash-preview': { inputPer1M: 0.50, outputPer1M: 3.00, cacheCreationPer1M: 0.50, cacheReadPer1M: 0.125 },
+    'gemini-3-pro-preview': { inputPer1M: 2.50, outputPer1M: 10.00, cacheCreationPer1M: 2.50, cacheReadPer1M: 0.625 }, // Extrapolated Pro relative pricing based on history
+    'gemini-2.5-pro': { inputPer1M: 2.00, outputPer1M: 8.00, cacheCreationPer1M: 2.00, cacheReadPer1M: 0.50 },
+    'gemini-2.5-flash': { inputPer1M: 0.075, outputPer1M: 0.30, cacheCreationPer1M: 0.075, cacheReadPer1M: 0.01875 },
+    'gemini-2.0-flash-exp': { inputPer1M: 0.075, outputPer1M: 0.30, cacheCreationPer1M: 0.075, cacheReadPer1M: 0.01875 },
+    'gemini-1.5-flash': { inputPer1M: 0.075, outputPer1M: 0.30, cacheCreationPer1M: 0.075, cacheReadPer1M: 0.01875 },
+    'gemini-1.5-pro': { inputPer1M: 1.25, outputPer1M: 5.00, cacheCreationPer1M: 1.25, cacheReadPer1M: 0.3125 },
 
     // Claude 3.5 Models (Anthropic / Bedrock)
     'claude-3-5-sonnet-20241022': { inputPer1M: 3.00, outputPer1M: 15.00, cacheCreationPer1M: 3.75, cacheReadPer1M: 0.30 },
