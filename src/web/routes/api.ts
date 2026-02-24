@@ -10,21 +10,26 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// GET /api/summary?period=day|month&source=
+// GET /api/summary?period=hour|day|week|month&source=
 apiRouter.get('/summary', async (req: Request, res: Response) => {
   try {
-    const period = req.query['period'] === 'month' ? 'month' : 'day';
-    const format = period === 'month' ? '%Y-%m' : '%Y-%m-%d';
+    const period = (req.query['period'] as string) || 'day';
+    let format = '%Y-%m-%d';
+    if (period === 'hour') format = '%Y-%m-%d %H:00';
+    else if (period === 'month') format = '%Y-%m';
+    else if (period === 'week') format = '%Y-W%V'; // ISO Week
+
     const source = req.query['source'] as string | undefined;
     const db = await getDb();
     const col = db.collection(COLLECTION);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sourceFilter: Record<string, any> = {};
     if (source === 'rlm') sourceFilter = { source: { $in: ['cli', 'mcp'] } };
     else if (source) sourceFilter = { source };
-    const matchStage: Record<string, any> = { $match: sourceFilter };
+
     const results = await col.aggregate([
-      matchStage,
+      { $match: sourceFilter },
       {
         $group: {
           _id: {
@@ -96,11 +101,31 @@ apiRouter.get('/projects', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/projects/:name?period=day|month&source=
+// GET /api/projects/:name/logs?limit=50
+apiRouter.get('/projects/:name/logs', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query['limit'] as string) || 50;
+    const db = await getDb();
+    const col = db.collection(COLLECTION);
+    const logs = await col.find({ project: req.params['name'] })
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .toArray();
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /api/projects/:name?period=hour|day|week|month&source=
 apiRouter.get('/projects/:name', async (req: Request, res: Response) => {
   try {
-    const period = req.query['period'] === 'month' ? 'month' : 'day';
-    const format = period === 'month' ? '%Y-%m' : '%Y-%m-%d';
+    const period = (req.query['period'] as string) || 'day';
+    let format = '%Y-%m-%d';
+    if (period === 'hour') format = '%Y-%m-%d %H:00';
+    else if (period === 'month') format = '%Y-%m';
+    else if (period === 'week') format = '%Y-W%V';
+
     const source = req.query['source'] as string | undefined;
     const db = await getDb();
     const col = db.collection(COLLECTION);
@@ -108,6 +133,7 @@ apiRouter.get('/projects/:name', async (req: Request, res: Response) => {
     let sourceFilter: Record<string, any> = {};
     if (source === 'rlm') sourceFilter = { source: { $in: ['cli', 'mcp'] } };
     else if (source) sourceFilter = { source };
+
     const results = await col.aggregate([
       { $match: { project: req.params['name'], ...sourceFilter } },
       {

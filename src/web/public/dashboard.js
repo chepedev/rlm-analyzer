@@ -4,22 +4,24 @@ const fmt = (v) => `$${Number(v).toFixed(4)}`;
 const fmtNum = (v) => Number(v).toLocaleString();
 
 let currentSource = '';
+let currentPeriod = 'day';
 let dailyChart = null;
 
-async function loadSummaryCards(source) {
+async function loadSummaryCards(source, period) {
   const today = new Date().toISOString().slice(0, 10);
   const thisMonth = today.slice(0, 7);
   const src = source !== undefined ? source : currentSource;
+  const per = period !== undefined ? period : currentPeriod;
   const qs = src ? `&source=${encodeURIComponent(src)}` : '';
 
   const [dayData, monthData, projectData] = await Promise.all([
-    fetch(`/api/summary?period=day${qs}`).then(r => r.json()),
+    fetch(`/api/summary?period=${per}${qs}`).then(r => r.json()),
     fetch(`/api/summary?period=month${qs}`).then(r => r.json()),
     fetch(`/api/projects${src ? '?source=' + encodeURIComponent(src) : ''}`).then(r => r.json()),
   ]);
 
   const todayCost = dayData
-    .filter(d => d.period === today)
+    .filter(d => d.period.startsWith(today))
     .reduce((s, d) => s + d.totalCost, 0);
 
   const monthCost = monthData
@@ -29,25 +31,42 @@ async function loadSummaryCards(source) {
   const allTimeCost = projectData.reduce((s, d) => s + d.totalCost, 0);
   const allTimeCount = projectData.reduce((s, d) => s + d.count, 0);
 
-  document.getElementById('cost-today').textContent  = fmt(todayCost);
-  document.getElementById('cost-month').textContent  = fmt(monthCost);
+  document.getElementById('cost-today').textContent = fmt(todayCost);
+  document.getElementById('cost-month').textContent = fmt(monthCost);
   document.getElementById('cost-alltime').textContent = fmt(allTimeCost);
   document.getElementById('count-alltime').textContent = fmtNum(allTimeCount);
 
+  updateChartTitle(per);
   renderDailyChart(dayData);
   renderProjectsTable(projectData);
 }
 
+function updateChartTitle(period) {
+  const titles = {
+    hour: 'Cost Per Hour (Recent)',
+    day: 'Daily Cost (Last 30 Days)',
+    week: 'Weekly Cost (Recent)',
+    month: 'Monthly Cost (Full History)'
+  };
+  document.getElementById('chart-title').textContent = titles[period] || 'Cost Breakdown';
+}
+
 function renderDailyChart(dayData) {
-  // Aggregate across all projects per day
+  // Aggregate across all projects per period
   const map = {};
   for (const d of dayData) {
     map[d.period] = (map[d.period] || 0) + d.totalCost;
   }
 
-  const sorted = Object.entries(map).sort((a, b) => a[0].localeCompare(b[0])).slice(-30);
-  const labels = sorted.map(e => e[0]);
-  const values = sorted.map(e => e[1]);
+  const sorted = Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
+  // Limit based on period
+  let limit = 30;
+  if (currentPeriod === 'hour') limit = 24;
+  if (currentPeriod === 'month') limit = 12;
+  const results = sorted.slice(-limit);
+
+  const labels = results.map(e => e[0]);
+  const values = results.map(e => e[1]);
 
   const ctx = document.getElementById('chart-daily').getContext('2d');
   if (dailyChart) {
@@ -134,7 +153,12 @@ async function deleteProject(encodedName) {
 
 function filterBySource(value) {
   currentSource = value;
-  loadSummaryCards(value).catch(console.error);
+  loadSummaryCards(currentSource, currentPeriod).catch(console.error);
+}
+
+function updatePeriod(value) {
+  currentPeriod = value;
+  loadSummaryCards(currentSource, currentPeriod).catch(console.error);
 }
 
 document.getElementById('btn-clean').addEventListener('click', async () => {

@@ -30,7 +30,15 @@ pagesRouter.get('/', (_req: Request, res: Response) => {
   const body = `
     <div class="page-header">
       <h1>Dashboard</h1>
-      <button id="btn-clean" class="btn btn-danger">🗑 Clean All Logs</button>
+      <div class="page-actions">
+        <select id="period-filter" class="select-field" onchange="updatePeriod(this.value)">
+          <option value="hour">Per Hour</option>
+          <option value="day" selected>Per Day</option>
+          <option value="week">Per Week</option>
+          <option value="month">Per Month</option>
+        </select>
+        <button id="btn-clean" class="btn btn-danger">🗑 Clean All Logs</button>
+      </div>
     </div>
 
     <div class="cards-row" id="summary-cards">
@@ -53,7 +61,7 @@ pagesRouter.get('/', (_req: Request, res: Response) => {
     </div>
 
     <div class="section">
-      <h2>Daily Cost (Last 30 Days)</h2>
+      <h2 id="chart-title">Daily Cost (Last 30 Days)</h2>
       <div class="chart-wrap">
         <canvas id="chart-daily"></canvas>
       </div>
@@ -62,7 +70,7 @@ pagesRouter.get('/', (_req: Request, res: Response) => {
     <div class="section">
       <h2>Projects</h2>
       <div class="filter-bar">
-        <select id="source-filter" onchange="filterBySource(this.value)">
+        <select id="source-filter" class="select-field" onchange="filterBySource(this.value)">
           <option value="">All Sources</option>
           <option value="rlm">RLM Analyzer Only</option>
           <option value="kilocode">Kilo Code Only</option>
@@ -82,7 +90,7 @@ pagesRouter.get('/', (_req: Request, res: Response) => {
             </tr>
           </thead>
           <tbody id="projects-tbody">
-            <tr><td colspan="6" class="loading">Loading…</td></tr>
+            <tr><td colspan="7" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -123,16 +131,44 @@ pagesRouter.get('/project/:name', (req: Request, res: Response) => {
     </div>
 
     <div class="section">
-      <h2>Daily Cost</h2>
-      <div class="filter-bar">
-        <select id="source-filter" onchange="filterBySource(this.value)">
-          <option value="">All Sources</option>
-          <option value="rlm">RLM Analyzer Only</option>
-          <option value="kilocode">Kilo Code Only</option>
-        </select>
+      <div class="section-header">
+        <h2 id="chart-title">Daily Cost</h2>
+        <div class="filter-bar">
+          <select id="period-filter" class="select-field" onchange="updatePeriod(this.value)">
+            <option value="hour">Per Hour</option>
+            <option value="day" selected>Per Day</option>
+            <option value="week">Per Week</option>
+            <option value="month">Per Month</option>
+          </select>
+          <select id="source-filter" class="select-field" onchange="filterBySource(this.value)">
+            <option value="">All Sources</option>
+            <option value="rlm">RLM Analyzer Only</option>
+            <option value="kilocode">Kilo Code Only</option>
+          </select>
+        </div>
       </div>
       <div class="chart-wrap">
         <canvas id="chart-daily"></canvas>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Recent Activity</h2>
+      <div class="table-wrap">
+        <table id="logs-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Source</th>
+              <th>Model</th>
+              <th>Tokens (In/Out)</th>
+              <th>Cost (USD)</th>
+            </tr>
+          </thead>
+          <tbody id="logs-tbody">
+            <tr><td colspan="5" class="loading">Loading…</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 

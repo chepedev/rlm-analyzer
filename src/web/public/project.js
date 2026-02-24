@@ -5,6 +5,7 @@ const fmt = (v) => `$${Number(v).toFixed(4)}`;
 const fmtNum = (v) => Number(v).toLocaleString();
 
 let currentSource = '';
+let currentPeriod = 'day';
 let dailyChart = null;
 
 function filterBySource(value) {
@@ -12,31 +13,55 @@ function filterBySource(value) {
   loadProject().catch(console.error);
 }
 
+function updatePeriod(value) {
+  currentPeriod = value;
+  loadProject().catch(console.error);
+}
+
 async function loadProject() {
   const encoded = encodeURIComponent(project);
   const qs = currentSource ? `&source=${encodeURIComponent(currentSource)}` : '';
 
-  const [dayData, monthData] = await Promise.all([
-    fetch(`/api/projects/${encoded}?period=day${qs}`).then(r => r.json()),
+  const [perData, monthData, logData] = await Promise.all([
+    fetch(`/api/projects/${encoded}?period=${currentPeriod}${qs}`).then(r => r.json()),
     fetch(`/api/projects/${encoded}?period=month${qs}`).then(r => r.json()),
+    fetch(`/api/projects/${encoded}/logs`).then(r => r.json()),
   ]);
 
-  const totalCost   = dayData.reduce((s, d) => s + d.totalCost, 0);
-  const totalTokens = dayData.reduce((s, d) => s + d.totalTokens, 0);
-  const totalCount  = dayData.reduce((s, d) => s + d.count, 0);
+  // Use all-time data from monthly sums or first load for stats
+  const totalCost = monthData.reduce((s, d) => s + d.totalCost, 0);
+  const totalTokens = monthData.reduce((s, d) => s + d.totalTokens, 0);
+  const totalCount = monthData.reduce((s, d) => s + d.count, 0);
 
-  document.getElementById('stat-cost').textContent   = fmt(totalCost);
+  document.getElementById('stat-cost').textContent = fmt(totalCost);
   document.getElementById('stat-tokens').textContent = fmtNum(totalTokens);
-  document.getElementById('stat-count').textContent  = fmtNum(totalCount);
+  document.getElementById('stat-count').textContent = fmtNum(totalCount);
 
-  renderDailyChart(dayData);
+  updateChartTitle(currentPeriod);
+  renderDailyChart(perData);
+  renderLogsTable(logData);
   renderMonthlyTable(monthData);
 }
 
+function updateChartTitle(period) {
+  const titles = {
+    hour: 'Cost Per Hour (Recent)',
+    day: 'Daily Cost',
+    week: 'Weekly Cost',
+    month: 'Monthly Cost'
+  };
+  document.getElementById('chart-title').textContent = titles[period] || 'Cost Breakdown';
+}
+
 function renderDailyChart(dayData) {
-  const sorted = [...dayData].sort((a, b) => a.period.localeCompare(b.period)).slice(-30);
-  const labels = sorted.map(d => d.period);
-  const values = sorted.map(d => d.totalCost);
+  const sorted = [...dayData].sort((a, b) => a.period.localeCompare(b.period));
+  let limit = 30;
+  if (currentPeriod === 'hour') limit = 24;
+  if (currentPeriod === 'month') limit = 12;
+  const results = sorted.slice(-limit);
+
+  const labels = results.map(d => d.period);
+  const values = results.map(d => d.totalCost);
 
   const ctx = document.getElementById('chart-daily').getContext('2d');
   if (dailyChart) {
@@ -78,6 +103,23 @@ function renderDailyChart(dayData) {
       },
     },
   });
+}
+
+function renderLogsTable(logs) {
+  const tbody = document.getElementById('logs-tbody');
+  if (!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="loading">No activity yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = logs.map(log => `
+    <tr>
+      <td>${new Date(log.timestamp).toLocaleString()}</td>
+      <td><span class="badge badge-${log.source}">${log.source.toUpperCase()}</span></td>
+      <td class="code-font">${log.model}</td>
+      <td>${fmtNum(log.inputTokens)} / ${fmtNum(log.outputTokens)}</td>
+      <td class="cost-cell">${fmt(log.costUsd)}</td>
+    </tr>
+  `).join('');
 }
 
 function renderMonthlyTable(monthData) {
