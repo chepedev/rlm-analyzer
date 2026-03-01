@@ -559,82 +559,85 @@ async function runCommand(
 
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-
-  // Print results
-  log('\n' + '═'.repeat(50), 'cyan');
-  log('ANALYSIS RESULT', 'bold');
-  log('═'.repeat(50), 'cyan');
-
-  if (result.success && result.answer) {
-    log('\n' + result.answer, 'reset');
-  } else if (result.error) {
-    log(`\nError: ${result.error}`, 'red');
   } else {
-    log('\nAnalysis incomplete. No final answer generated.', 'yellow');
-    if (result.turns.length > 0) {
-      log('\nPartial output from turns:', 'dim');
-      for (const turn of result.turns.slice(-3)) {
-        if (turn.executionResult) {
-          log(turn.executionResult.slice(0, 500), 'dim');
+    // Print results
+    log('\n' + '═'.repeat(50), 'cyan');
+    log('ANALYSIS RESULT', 'bold');
+    log('═'.repeat(50), 'cyan');
+
+    if (result.success && result.answer) {
+      log('\n' + result.answer, 'reset');
+    } else if (result.error) {
+      log(`\nError: ${result.error}`, 'red');
+    } else {
+      log('\nAnalysis incomplete. No final answer generated.', 'yellow');
+      if (result.turns.length > 0) {
+        log('\nPartial output from turns:', 'dim');
+        for (const turn of result.turns.slice(-3)) {
+          if (turn.executionResult) {
+            log(turn.executionResult.slice(0, 500), 'dim');
+          }
         }
+      }
+    }
+
+    log('\n' + '─'.repeat(50), 'dim');
+    log(`Provider: ${provider.name}`, 'dim');
+    log(`Files analyzed: ${result.filesAnalyzed.length}`, 'dim');
+    log(`Turns: ${result.turns.length}`, 'dim');
+    log(`Sub-LLM calls: ${result.subCallCount}`, 'dim');
+    if (result.tokenUsage) {
+      const cachedTokens = result.tokenUsage.cacheReadTokens || 0;
+      const cacheCreationTokens = result.tokenUsage.cacheCreationTokens || 0;
+      const toolTokens = result.tokenUsage.toolUseTokens || 0;
+      const thoughtsTokens = result.tokenUsage.thoughtsTokens || 0;
+
+      let cacheStr = cachedTokens > 0 ? `, ${cachedTokens.toLocaleString()} cache read` : '';
+      let cacheCrStr = cacheCreationTokens > 0 ? `, ${cacheCreationTokens.toLocaleString()} cache creation` : '';
+      let toolStr = toolTokens > 0 ? `, ${toolTokens.toLocaleString()} tool` : '';
+      let thoughtsStr = thoughtsTokens > 0 ? `, ${thoughtsTokens.toLocaleString()} thoughts` : '';
+
+      log(`Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in, ${result.tokenUsage.outputTokens.toLocaleString()} out${cacheStr}${cacheCrStr}${toolStr}${thoughtsStr})`, 'dim');
+    }
+    if (result.costUsd !== undefined && result.costUsd > 0) {
+      log(`Est. Cost: $${result.costUsd.toFixed(4)}`, 'green');
+    }
+    log(`Time: ${duration}s`, 'dim');
+
+    // Save to markdown file if output option specified
+    if (options.output) {
+      const outputPath = path.isAbsolute(options.output) ? options.output : path.join(options.dir, options.output);
+      const markdown = generateMarkdownReport(command, target, options.dir, result, duration, provider.name);
+      try {
+        fs.writeFileSync(outputPath, markdown, 'utf-8');
+        log(`\n✓ Results saved to: ${outputPath}`, 'green');
+      } catch (err) {
+        log(`\n✗ Failed to save results: ${err instanceof Error ? err.message : String(err)}`, 'red');
       }
     }
   }
 
-  log('\n' + '─'.repeat(50), 'dim');
-  log(`Provider: ${provider.name}`, 'dim');
-  log(`Files analyzed: ${result.filesAnalyzed.length}`, 'dim');
-  log(`Turns: ${result.turns.length}`, 'dim');
-  log(`Sub-LLM calls: ${result.subCallCount}`, 'dim');
-  if (result.tokenUsage) {
-    const cachedTokens = result.tokenUsage.cacheReadTokens || 0;
-    const cacheCreationTokens = result.tokenUsage.cacheCreationTokens || 0;
-    const toolTokens = result.tokenUsage.toolUseTokens || 0;
-    const thoughtsTokens = result.tokenUsage.thoughtsTokens || 0;
+  // Log usage to MongoDB
+  try {
+    await logUsage({
+      provider: provider.name,
+      model: options.model,
+      analysisType: command,
+      directory: options.dir,
+      inputTokens: result.tokenUsage?.inputTokens ?? 0,
+      outputTokens: result.tokenUsage?.outputTokens ?? 0,
+      totalTokens: result.tokenUsage?.totalTokens ?? 0,
+      costUsd: result.costUsd ?? 0,
+      executionTimeMs: parseFloat(duration) * 1000,
+      subCallCount: result.subCallCount ?? 0,
+      source: 'cli',
+      success: result.success,
+      cacheHit: result.cacheHit,
+      changedFilesCount: result.changedFilesCount,
+    });
+  } catch { /* silent */ }
 
-    let cacheStr = cachedTokens > 0 ? `, ${cachedTokens.toLocaleString()} cache read` : '';
-    let cacheCrStr = cacheCreationTokens > 0 ? `, ${cacheCreationTokens.toLocaleString()} cache creation` : '';
-    let toolStr = toolTokens > 0 ? `, ${toolTokens.toLocaleString()} tool` : '';
-    let thoughtsStr = thoughtsTokens > 0 ? `, ${thoughtsTokens.toLocaleString()} thoughts` : '';
-
-    log(`Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (${result.tokenUsage.inputTokens.toLocaleString()} in, ${result.tokenUsage.outputTokens.toLocaleString()} out${cacheStr}${cacheCrStr}${toolStr}${thoughtsStr})`, 'dim');
-  }
-  if (result.costUsd !== undefined && result.costUsd > 0) {
-    log(`Est. Cost: $${result.costUsd.toFixed(4)}`, 'green');
-  }
-  log(`Time: ${duration}s`, 'dim');
-
-  // Log usage to MongoDB (fire-and-forget)
-  logUsage({
-    provider: provider.name,
-    model: options.model,
-    analysisType: command,
-    directory: options.dir,
-    inputTokens: result.tokenUsage?.inputTokens ?? 0,
-    outputTokens: result.tokenUsage?.outputTokens ?? 0,
-    totalTokens: result.tokenUsage?.totalTokens ?? 0,
-    costUsd: result.costUsd ?? 0,
-    executionTimeMs: parseFloat(duration) * 1000,
-    subCallCount: result.subCallCount ?? 0,
-    source: 'cli',
-    success: result.success,
-    cacheHit: result.cacheHit,
-    changedFilesCount: result.changedFilesCount,
-  }).catch(() => { /* silent */ });
-
-  // Save to markdown file if output option specified
-  if (options.output) {
-    const outputPath = path.isAbsolute(options.output) ? options.output : path.join(options.dir, options.output);
-    const markdown = generateMarkdownReport(command, target, options.dir, result, duration, provider.name);
-    try {
-      fs.writeFileSync(outputPath, markdown, 'utf-8');
-      log(`\n✓ Results saved to: ${outputPath}`, 'green');
-    } catch (err) {
-      log(`\n✗ Failed to save results: ${err instanceof Error ? err.message : String(err)}`, 'red');
-    }
-  }
+  process.exit(result.success ? 0 : 1);
 }
 
 /**

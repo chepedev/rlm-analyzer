@@ -26,6 +26,7 @@ export interface UsageLog {
   success: boolean;
   cacheHit?: boolean;
   changedFilesCount?: number;
+  sessionId?: string;
 }
 
 export type UsageLogInput = Omit<UsageLog, 'timestamp' | 'project'> & {
@@ -48,6 +49,7 @@ async function connect(): Promise<Db> {
     const col: Collection<UsageLog> = db.collection(COLLECTION_NAME);
     await col.createIndex({ timestamp: -1 });
     await col.createIndex({ project: 1, timestamp: -1 });
+    await col.createIndex({ sessionId: 1 }, { sparse: true });
     indexesCreated = true;
   }
 
@@ -62,12 +64,45 @@ export async function logUsage(data: UsageLogInput): Promise<void> {
   try {
     const database = await connect();
     const col: Collection<UsageLog> = database.collection(COLLECTION_NAME);
-    const doc: UsageLog = {
+    const doc: Omit<UsageLog, '_id'> = {
       ...data,
       timestamp: new Date(),
       project: data.project ?? path.basename(data.directory),
     };
-    await col.insertOne(doc);
+
+    if (data.sessionId) {
+      // Upsert based on sessionId
+      // We only update if the new costUsd is greater or we're creating a new one
+      // We also update timestamp to reflect the latest activity
+      await col.updateOne(
+        { sessionId: data.sessionId },
+        {
+          $set: {
+            timestamp: doc.timestamp,
+            provider: doc.provider,
+            model: doc.model,
+            analysisType: doc.analysisType,
+            project: doc.project,
+            directory: doc.directory,
+            inputTokens: doc.inputTokens,
+            outputTokens: doc.outputTokens,
+            totalTokens: doc.totalTokens,
+            subCallCount: doc.subCallCount,
+            source: doc.source,
+            success: doc.success,
+            ...(doc.cacheHit !== undefined ? { cacheHit: doc.cacheHit } : {}),
+            ...(doc.changedFilesCount !== undefined ? { changedFilesCount: doc.changedFilesCount } : {})
+          },
+          $max: {
+            costUsd: doc.costUsd,
+            executionTimeMs: doc.executionTimeMs
+          }
+        },
+        { upsert: true }
+      );
+    } else {
+      await col.insertOne(doc as UsageLog);
+    }
   } catch (err) {
     console.error('[rlm-analyzer] cost-logger: failed to log usage:', err instanceof Error ? err.message : String(err));
   }

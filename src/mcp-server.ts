@@ -316,6 +316,7 @@ const TOOLS = [
         outputTokens: { type: 'number', description: 'Total output tokens (from environment_details)' },
         sessionNotes: { type: 'string', description: 'Brief description of what was done (optional)' },
         source: { type: 'string', description: 'Source identifier (default: kilocode)', default: 'kilocode' },
+        sessionId: { type: 'string', description: 'Unique identifier for the session to accumulate costs (e.g., conversation ID)' },
       },
       required: ['project', 'model', 'costUsd', 'inputTokens', 'outputTokens'],
     },
@@ -540,15 +541,16 @@ Use 'provider' parameter to switch between providers.`,
       }
 
       case 'rlm_log_session': {
-        const { project, model: sessionModel, costUsd, inputTokens = 0, outputTokens = 0, sessionNotes, source = 'kilocode' } = args as {
-          project: string;
-          model: string;
-          costUsd: number;
-          inputTokens?: number;
-          outputTokens?: number;
-          sessionNotes?: string;
-          source?: string;
-        };
+        const _args = args as any;
+        const project = String(_args.project);
+        const sessionModel = String(_args.model);
+        const costUsd = Number(_args.costUsd) || 0;
+        const inputTokens = Number(_args.inputTokens) || 0;
+        const outputTokens = Number(_args.outputTokens) || 0;
+        const sessionNotes = _args.sessionNotes ? String(_args.sessionNotes) : undefined;
+        const source = _args.source ? String(_args.source) : 'kilocode';
+        const sessionId = _args.sessionId ? String(_args.sessionId) : undefined;
+
         await logUsage({
           provider: source,
           model: sessionModel,
@@ -562,6 +564,7 @@ Use 'provider' parameter to switch between providers.`,
           subCallCount: 0,
           source,
           success: true,
+          sessionId,
         });
         return {
           content: [{ type: 'text', text: `✅ Session logged: ${project} — $${costUsd.toFixed(4)} (${sessionModel})` }],
